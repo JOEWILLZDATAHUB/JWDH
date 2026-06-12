@@ -1868,14 +1868,15 @@ function submitOrder() {
   const msg = buildWhatsAppMessage(order);
   const waURL = `https://wa.me/${PAYMENT_INFO.whatsapp}?text=${encodeURIComponent(msg)}`;
 
+  // Open WhatsApp immediately — must stay in the user-gesture (click) context
+  // so browsers don't block it as a popup. Calling window.open inside setTimeout
+  // breaks this context and causes the redirect to be silently blocked.
+  window.open(waURL, '_blank');
+
   setTimeout(() => {
     closePaymentModal();
     resetOrderForm();
-    showToast('Order submitted! Opening WhatsApp...', 'success');
-
-    setTimeout(() => {
-      window.open(waURL, '_blank');
-    }, 800);
+    showToast('Order submitted! WhatsApp opened.', 'success');
 
     btn.disabled = false;
     btn.innerHTML = '<svg class="w-4 h-4"><use href="#icon-whatsapp"/></svg> Submit Order via WhatsApp';
