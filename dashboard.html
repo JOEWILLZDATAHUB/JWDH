@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — JoeWillz Data Bundle Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #F1F5F9; }
+
+    /* ── LAYOUT ─────────────────────────────── */
+    #admin-app { display: flex; height: 100vh; overflow: hidden; }
+    #sidebar {
+      width: 240px; background: #0f1629; display: flex;
+      flex-direction: column; flex-shrink: 0; overflow-y: auto;
+      transition: transform 0.25s ease;
+    }
+    #main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    #content-area { flex: 1; overflow-y: auto; padding: 24px; }
+
+    /* Mobile sidebar overlay */
+    #sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 40;
+    }
+    @media (max-width: 768px) {
+      #sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 50; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); }
+      #sidebar-overlay.open { display: block; }
+    }
+
+    /* ── SECTION PANELS ─────────────────────── */
+    .section-panel { display: none; }
+    .section-panel.active { display: block; }
+
+    /* ── NAV ITEMS ───────────────────────────── */
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-radius: 8px; cursor: pointer;
+      color: #94a3b8; font-size: 14px; font-weight: 500;
+      transition: all 0.15s; margin: 1px 8px; text-decoration: none;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+    .nav-item.active { background: rgba(30,111,217,0.18); color: #60a5fa; }
+    .nav-item svg { flex-shrink: 0; width: 18px; height: 18px; }
+
+    /* ── FORM INPUTS ─────────────────────────── */
+    .form-input {
+      width: 100%; padding: 9px 13px; border: 1.5px solid #e2e8f0;
+      border-radius: 8px; font-size: 14px; outline: none; color: #1e293b;
+      transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
+      font-family: 'Inter', sans-serif;
+    }
+    .form-input:focus { border-color: #0A4D9C; box-shadow: 0 0 0 3px rgba(10,77,156,0.08); }
+    .form-input.error { border-color: #ef4444; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px; }
+
+    /* ── BUTTONS ─────────────────────────────── */
+    .btn-primary {
+      background: #0A4D9C; color: #fff; padding: 9px 18px; border-radius: 8px;
+      font-weight: 600; font-size: 13px; border: none; cursor: pointer;
+      transition: background 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary:hover { background: #083d7d; }
+    .btn-outline {
+      background: #fff; color: #0A4D9C; padding: 9px 18px; border-radius: 8px;
+      font-weight: 600; font-size: 13px; border: 2px solid #0A4D9C; cursor: pointer;
+      transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-outline:hover { background: #0A4D9C; color: #fff; }
+    .btn-danger {
+      background: #fff; color: #dc2626; padding: 9px 18px; border-radius: 8px;
+      font-weight: 600; font-size: 13px; border: 2px solid #fca5a5; cursor: pointer;
+      transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-danger:hover { background: #fee2e2; border-color: #dc2626; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+    .btn-icon {
+      width: 32px; height: 32px; border-radius: 7px; border: 1.5px solid #e2e8f0;
+      background: #fff; cursor: pointer; display: inline-flex; align-items: center;
+      justify-content: center; color: #64748b; transition: all 0.15s;
+    }
+    .btn-icon:hover { background: #f1f5f9; color: #1e293b; }
+    .btn-icon.danger:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+
+    /* ── TABLES ───────────────────────────────── */
+    .a-table { width: 100%; border-collapse: collapse; }
+    .a-table th {
+      background: #F8FAFC; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8;
+      padding: 11px 16px; text-align: left; white-space: nowrap;
+    }
+    .a-table td { padding: 12px 16px; font-size: 13.5px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .a-table tbody tr:last-child td { border-bottom: none; }
+    .a-table tbody tr:hover td { background: #f8fafc; }
+
+    /* ── MODALS ───────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15,22,41,0.55); backdrop-filter: blur(3px);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 14px; width: 100%;
+      max-width: 480px; max-height: 90vh; overflow-y: auto;
+      margin: 16px; animation: modalIn 0.2s ease;
+    }
+    .modal-box.sm { max-width: 380px; }
+    @keyframes modalIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ── TOGGLE SWITCH ────────────────────────── */
+    .toggle-wrap { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+    .toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      display: block; width: 38px; height: 21px;
+      background: #cbd5e1; border-radius: 11px; position: relative;
+      cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+    }
+    .toggle-track::after {
+      content: ''; position: absolute; top: 2.5px; left: 2.5px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      transition: transform 0.2s;
+    }
+    .toggle-input:checked + .toggle-track { background: #16a34a; }
+    .toggle-input:checked + .toggle-track::after { transform: translateX(17px); }
+
+    /* ── STAT CARDS ────────────────────────────── */
+    .stat-card {
+      background: #fff; border: 1px solid #f1f5f9; border-radius: 12px;
+      padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+
+    /* ── BADGES ───────────────────────────────── */
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .badge-pending    { background: #fef3c7; color: #92400e; }
+    .badge-processing { background: #dbeafe; color: #1e40af; }
+    .badge-completed  { background: #d1fae5; color: #065f46; }
+    .badge-active     { background: #d1fae5; color: #065f46; }
+    .badge-inactive   { background: #f1f5f9; color: #64748b; }
+    .badge-mtn        { background: #fefce8; color: #713f12; border: 1px solid #fde047; }
+    .badge-at         { background: #fff1f2; color: #9f1239; border: 1px solid #fda4af; }
+    .badge-telecel    { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+
+    /* ── NETWORK DOTS ──────────────────────────── */
+    .ndot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; flex-shrink: 0; }
+    .ndot-mtn     { background: #FFCC00; }
+    .ndot-at      { background: #E4002B; }
+    .ndot-telecel { background: #0099CC; }
+
+    /* ── SYNC INDICATOR ─────────────────────────── */
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+    .sync-live { background: #22c55e; }
+    .sync-idle { background: #94a3b8; animation: none; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* ── TOAST ─────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; padding: 11px 18px;
+      border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff;
+      z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      animation: toastIn 0.25s ease; max-width: 320px;
+    }
+    @keyframes toastIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
+
+    /* ── MISC ───────────────────────────────────── */
+    .card { background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .section-title { font-size: 17px; font-weight: 800; color: #0f172a; }
+    .section-sub   { font-size: 13px; color: #64748b; margin-top: 2px; }
+    .pkg-tab { padding: 7px 18px; border-radius: 20px; border: 2px solid #e2e8f0; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s; color: #64748b; display: inline-flex; align-items: center; gap: 6px; }
+    .pkg-tab.active-mtn { background: #fef9c3; border-color: #FFCC00; color: #713f12; }
+    .pkg-tab.active-at  { background: #fff1f2; border-color: #E4002B; color: #9f1239; }
+    .pkg-tab.active-telecel { background: #e0f2fe; border-color: #0099CC; color: #075985; }
+    .editable-field:hover { background: #f0f9ff; }
+    .color-swatch { display: inline-block; width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); vertical-align: middle; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     LOGIN SCREEN
+═══════════════════════════════════════════ -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center" style="background: linear-gradient(135deg, #0f1629 0%, #0A4D9C 100%);">
+  <div class="w-full max-w-sm mx-4">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+        <svg class="w-7 h-7 text-white" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+        </svg>
+      </div>
+      <h1 class="text-xl font-extrabold text-white">JoeWillz Admin</h1>
+      <p class="text-blue-300 text-sm mt-1">Data Bundle Hub — Control Panel</p>
+    </div>
+
+    <!-- Login card -->
+    <div class="bg-white rounded-2xl p-7 shadow-2xl">
+      <h2 class="font-bold text-gray-900 mb-1">Sign In</h2>
+      <p class="text-gray-500 text-sm mb-5">Enter your admin password to continue.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="form-label">Admin Password</label>
+          <input type="password" id="login-pw" class="form-input" placeholder="Enter password"
+                 onkeydown="if(event.key==='Enter') doLogin()">
+          <p id="login-err" class="text-red-500 text-xs mt-1.5 hidden">Incorrect password. Please try again.</p>
+        </div>
+        <button onclick="doLogin()" class="btn-primary w-full justify-center py-3 text-sm">
+          Sign In to Dashboard
+        </button>
+      </div>
+      <p class="text-center text-xs text-gray-400 mt-4">Default password: <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">JoeWillz@2026</span></p>
+    </div>
+    <p class="text-center text-blue-300/60 text-xs mt-4">
+      <a href="index.html" class="hover:text-blue-300 transition-colors">← Back to Main Site</a>
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     ADMIN APP (hidden until authenticated)
+═══════════════════════════════════════════ -->
+<div id="admin-app" style="display:none">
+  <!-- Mobile Sidebar Overlay -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ─── SIDEBAR ─────────────────────────── -->
+  <aside id="sidebar">
+    <!-- Logo -->
+    <div class="px-4 py-5 border-b border-white/10 flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-bold text-sm leading-tight">JoeWillz</p>
+          <p class="text-blue-400 text-xs">Admin Panel</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 py-3">
+      <p class="px-5 text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2 mt-1">Main</p>
+      <a class="nav-item active" id="nav-overview" onclick="switchSection('overview')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>
+        Overview
+      </a>
+      <a class="nav-item" id="nav-packages" onclick="switchSection('packages')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M11 17a1 1 0 001.447.894l4-2A1 1 0 0017 15V9.236a1 1 0 00-1.447-.894l-4 2a1 1 0 00-.553.894V17zM15.211 6.276a1 1 0 000-1.788l-4.764-2.382a1 1 0 00-.894 0L4.789 4.488a1 1 0 000 1.788l4.764 2.382a1 1 0 00.894 0l4.764-2.382zM4.447 8.342A1 1 0 003 9.236V15a1 1 0 00.553.894l4 2A1 1 0 009 17v-5.764a1 1 0 00-.553-.894l-4-2z"/></svg>
+        Packages
+        <span id="pkg-count" class="ml-auto bg-blue-900/60 text-blue-300 text-xs px-1.5 rounded-full">0</span>
+      </a>
+      <a class="nav-item" id="nav-promotions" onclick="switchSection('promotions')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/></svg>
+        Promotions
+        <span id="promo-active-count" class="ml-auto bg-amber-900/50 text-amber-300 text-xs px-1.5 rounded-full hidden">0</span>
+      </a>
+
+      <p class="px-5 text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2 mt-4">Site</p>
+      <a class="nav-item" id="nav-content" onclick="switchSection('content')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+        Content
+      </a>
+      <a class="nav-item" id="nav-orders" onclick="switchSection('orders')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+        Orders
+        <span id="pending-badge" class="ml-auto bg-amber-500 text-white text-xs px-1.5 rounded-full hidden">0</span>
+      </a>
+      <a class="nav-item" id="nav-settings" onclick="switchSection('settings')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+        Settings
+      </a>
+    </nav>
+
+    <!-- Sidebar Footer -->
+    <div class="border-t border-white/10 p-4 space-y-3">
+      <!-- Sync Status -->
+      <div class="flex items-center gap-2">
+        <span id="sync-dot" class="sync-dot sync-live"></span>
+        <span id="sync-label" class="text-xs text-gray-400">Syncing live</span>
+      </div>
+      <!-- View Site link -->
+      <a href="index.html" target="_blank" class="nav-item py-2 px-3 block" style="margin:0">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+        View Site
+      </a>
+      <!-- Logout -->
+      <button onclick="doLogout()" class="nav-item py-2 px-3 w-full text-left" style="margin:0;background:none;border:none">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+        Log Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN CONTENT ──────────────────────── -->
+  <div id="main-wrap">
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-gray-100 px-5 py-3.5 flex items-center justify-between flex-shrink-0 gap-4">
+      <div class="flex items-center gap-3">
+        <!-- Mobile hamburger -->
+        <button onclick="openSidebar()" class="md:hidden btn-icon">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+        </button>
+        <div>
+          <h1 id="page-title" class="text-base font-bold text-gray-900">Overview</h1>
+          <p id="page-sub" class="text-xs text-gray-400 hidden sm:block">Dashboard summary and quick stats</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Last saved indicator -->
+        <div id="save-indicator" class="hidden items-center gap-1.5 text-xs text-green-600 font-medium">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Saved
+        </div>
+        <div class="text-xs text-gray-400 hidden sm:block">
+          Last: <span id="last-saved">—</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <main id="content-area">
+
+      <!-- ══════════════════════════════════════
+           SECTION: OVERVIEW
+      ══════════════════════════════════════ -->
+      <div id="sec-overview" class="section-panel active">
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="stat-card">
+            <p class="text-xs text-gray-500 font-medium mb-1">Total Revenue</p>
+            <p id="stat-revenue" class="text-2xl font-extrabold text-gray-900">GHS 0</p>
+            <p class="text-xs text-gray-400 mt-1">Completed orders</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs text-gray-500 font-medium mb-1">Total Orders</p>
+            <p id="stat-orders" class="text-2xl font-extrabold text-gray-900">0</p>
+            <p class="text-xs text-gray-400 mt-1">All time</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs text-gray-500 font-medium mb-1">Active Packages</p>
+            <p id="stat-pkgs" class="text-2xl font-extrabold text-gray-900">0</p>
+            <p class="text-xs text-gray-400 mt-1">Across all networks</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs text-gray-500 font-medium mb-1">Pending Orders</p>
+            <p id="stat-pending" class="text-2xl font-extrabold text-amber-500">0</p>
+            <p class="text-xs text-gray-400 mt-1">Awaiting processing</p>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid lg:grid-cols-3 gap-5 mb-6">
+          <!-- Revenue Trend -->
+          <div class="lg:col-span-2 card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-bold text-gray-900 text-sm">Revenue Trend</h3>
+                <p class="text-xs text-gray-400">Completed orders revenue</p>
+              </div>
+              <select id="rev-period" class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none" onchange="updateRevenueChart()">
+                <option value="7">Last 7 Days</option>
+                <option value="14">Last 14 Days</option>
+                <option value="30">Last 30 Days</option>
+              </select>
+            </div>
+            <div style="height:190px; position:relative;">
+              <canvas id="revenue-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Network Distribution -->
+          <div class="card p-5">
+            <div class="mb-4">
+              <h3 class="font-bold text-gray-900 text-sm">Orders by Network</h3>
+              <p class="text-xs text-gray-400">All-time distribution</p>
+            </div>
+            <div style="height:140px; position:relative;">
+              <canvas id="network-chart"></canvas>
+            </div>
+            <div id="net-legend" class="mt-3 space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h3 class="font-bold text-gray-900 text-sm">Recent Orders</h3>
+            <button onclick="switchSection('orders')" class="text-xs text-blue-600 hover:underline font-medium">View All</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="a-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th><th>Customer</th><th>Network</th>
+                  <th>Package</th><th>Amount</th><th>Status</th><th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="recent-orders-tbody">
+                <tr><td colspan="7" class="text-center py-8 text-gray-400 text-sm">No orders yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           SECTION: PACKAGES
+      ══════════════════════════════════════ -->
+      <div id="sec-packages" class="section-panel">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="section-title">Package Management</h2>
+            <p class="section-sub">Add, edit, or disable data packages per network. Changes publish instantly.</p>
+          </div>
+          <button onclick="openPkgModal()" class="btn-primary flex-shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            Add Package
+          </button>
+        </div>
+
+        <!-- Network Tabs -->
+        <div class="flex gap-2 mb-5 flex-wrap">
+          <button id="ptab-MTN" class="pkg-tab active-mtn" onclick="switchPkgTab('MTN')">
+            <span class="ndot ndot-mtn"></span> MTN
+          </button>
+          <button id="ptab-AT" class="pkg-tab" onclick="switchPkgTab('AT')">
+            <span class="ndot ndot-at"></span> AT
+          </button>
+          <button id="ptab-Telecel" class="pkg-tab" onclick="switchPkgTab('Telecel')">
+            <span class="ndot ndot-telecel"></span> Telecel
+          </button>
+        </div>
+
+        <!-- Packages Table -->
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+            <p id="pkg-table-title" class="font-semibold text-gray-700 text-sm">MTN Packages</p>
+            <p id="pkg-table-count" class="text-xs text-gray-400"></p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="a-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Data Size</th><th>Price (GHS)</th>
+                  <th>Per GB</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pkg-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           SECTION: PROMOTIONS
+      ══════════════════════════════════════ -->
+      <div id="sec-promotions" class="section-panel">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="section-title">Promotions</h2>
+            <p class="section-sub">Create banners and announcements that display on the main website.</p>
+          </div>
+          <button onclick="openPromoModal()" class="btn-primary flex-shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            New Promotion
+          </button>
+        </div>
+
+        <div id="promos-list" class="space-y-4">
+          <div class="card p-8 text-center text-gray-400">
+            <svg class="w-10 h-10 mx-auto mb-3 opacity-40" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/></svg>
+            <p class="text-sm font-medium">No promotions yet.</p>
+            <p class="text-xs mt-1">Create your first promotion to display on the main site.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           SECTION: CONTENT
+      ══════════════════════════════════════ -->
+      <div id="sec-content" class="section-panel">
+        <div class="mb-5">
+          <h2 class="section-title">Content Management</h2>
+          <p class="section-sub">Edit website copy and announcement banners. Changes publish instantly to the main site.</p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-5">
+          <!-- Hero Text -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Hero Section</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Main Headline</label>
+                <input id="c-headline" type="text" class="form-input" placeholder="Main headline text">
+              </div>
+              <div>
+                <label class="form-label">Subheadline</label>
+                <textarea id="c-subheadline" class="form-input" rows="3" placeholder="Supporting subtitle text"></textarea>
+              </div>
+              <div>
+                <label class="form-label">Primary CTA Button Text</label>
+                <input id="c-cta1" type="text" class="form-input" placeholder="e.g. Buy Data Now">
+              </div>
+              <div>
+                <label class="form-label">Secondary CTA Button Text</label>
+                <input id="c-cta2" type="text" class="form-input" placeholder="e.g. Contact Support">
+              </div>
+              <button onclick="saveContent()" class="btn-primary w-full justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"/></svg>
+                Publish Hero Changes
+              </button>
+            </div>
+          </div>
+
+          <!-- Announcement Banner -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Announcement Banner</h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p class="font-semibold text-sm text-gray-700">Banner Active</p>
+                  <p class="text-xs text-gray-400">Show announcement bar on main site</p>
+                </div>
+                <label class="toggle-wrap">
+                  <input type="checkbox" id="c-ann-active" class="toggle-input" onchange="previewBanner()">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div>
+                <label class="form-label">Banner Text</label>
+                <input id="c-ann-text" type="text" class="form-input" placeholder="e.g. Special offer this week — 10% off all bundles!" oninput="previewBanner()">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="form-label">Background Color</label>
+                  <div class="flex items-center gap-2">
+                    <input id="c-ann-bg" type="color" class="w-10 h-9 rounded-lg border border-gray-200 cursor-pointer p-1" value="#0A4D9C" oninput="previewBanner()">
+                    <input id="c-ann-bg-text" type="text" class="form-input flex-1" value="#0A4D9C" oninput="syncColorInput('c-ann-bg','c-ann-bg-text')">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Text Color</label>
+                  <div class="flex items-center gap-2">
+                    <input id="c-ann-color" type="color" class="w-10 h-9 rounded-lg border border-gray-200 cursor-pointer p-1" value="#ffffff" oninput="previewBanner()">
+                    <input id="c-ann-color-text" type="text" class="form-input flex-1" value="#ffffff" oninput="syncColorInput('c-ann-color','c-ann-color-text')">
+                  </div>
+                </div>
+              </div>
+              <!-- Live Preview -->
+              <div>
+                <p class="form-label mb-2">Live Preview</p>
+                <div id="banner-preview" class="rounded-lg px-4 py-2.5 text-sm font-medium text-center transition-all" style="background:#0A4D9C;color:#fff">
+                  Banner text will appear here
+                </div>
+              </div>
+              <button onclick="saveBanner()" class="btn-primary w-full justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"/></svg>
+                Publish Banner Changes
+              </button>
+            </div>
+          </div>
+
+          <!-- Business Info -->
+          <div class="card p-5 lg:col-span-2">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Business Information</h3>
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label class="form-label">Business Name</label>
+                <input id="c-bizname" type="text" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Tagline / Footer Description</label>
+                <input id="c-tagline" type="text" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Default Delivery Time</label>
+                <input id="c-delivery" type="text" class="form-input" placeholder="e.g. 1–5 minutes">
+              </div>
+            </div>
+            <button onclick="saveBizInfo()" class="btn-primary mt-4">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"/></svg>
+              Save Business Info
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           SECTION: ORDERS
+      ══════════════════════════════════════ -->
+      <div id="sec-orders" class="section-panel">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="section-title">Order Management</h2>
+            <p class="section-sub">View and manage all customer orders. Update statuses or export records.</p>
+          </div>
+          <button onclick="exportOrders()" class="btn-outline flex-shrink-0 btn-sm">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            Export CSV
+          </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="card p-4 mb-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <div class="relative flex-1">
+              <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+              <input type="text" id="ord-search" class="form-input pl-9 text-sm" placeholder="Search name, phone, order ID..." oninput="renderOrders()">
+            </div>
+            <select id="ord-net" class="form-input text-sm w-full sm:w-36" onchange="renderOrders()">
+              <option value="">All Networks</option>
+              <option value="MTN">MTN</option>
+              <option value="AT">AT</option>
+              <option value="Telecel">Telecel</option>
+            </select>
+            <select id="ord-status" class="form-input text-sm w-full sm:w-40" onchange="renderOrders()">
+              <option value="">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Processing">Processing</option>
+              <option value="Completed">Completed</option>
+            </select>
+            <input type="date" id="ord-date" class="form-input text-sm w-full sm:w-44" onchange="renderOrders()">
+            <button onclick="clearOrdFilters()" class="btn-outline btn-sm flex-shrink-0 text-xs">Clear</button>
+          </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+            <p id="ord-count-label" class="text-sm font-semibold text-gray-700">All Orders</p>
+            <div class="flex gap-4 text-xs text-gray-500">
+              <span>Revenue: <strong id="ord-revenue-filter" class="text-gray-900">GHS 0</strong></span>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="a-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th><th>Date</th><th>Customer</th><th>Network</th>
+                  <th>Package</th><th>Amount</th><th>Recipient</th><th>Txn ID</th>
+                  <th>Status</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           SECTION: SETTINGS
+      ══════════════════════════════════════ -->
+      <div id="sec-settings" class="section-panel">
+        <div class="mb-5">
+          <h2 class="section-title">Settings</h2>
+          <p class="section-sub">Configure payment details, contact information, and admin security.</p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-5">
+          <!-- Payment Settings -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Payment Details</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Payment Network</label>
+                <input id="s-pay-network" type="text" class="form-input" placeholder="e.g. Telecel Cash">
+              </div>
+              <div>
+                <label class="form-label">Account Name</label>
+                <input id="s-pay-name" type="text" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Telecel Number (Display)</label>
+                <input id="s-pay-number" type="text" class="form-input" placeholder="+233 50 759 3896">
+              </div>
+              <div>
+                <label class="form-label">Telecel Number (WhatsApp — digits only)</label>
+                <input id="s-pay-wa" type="text" class="form-input" placeholder="233507593896">
+              </div>
+              <button onclick="savePaymentSettings()" class="btn-primary w-full justify-center">Save Payment Settings</button>
+            </div>
+          </div>
+
+          <!-- Contact Settings -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Contact Details</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Support Phone</label>
+                <input id="s-phone" type="text" class="form-input" placeholder="+233 50 759 3896">
+              </div>
+              <div>
+                <label class="form-label">WhatsApp Number</label>
+                <input id="s-whatsapp" type="text" class="form-input" placeholder="+233 50 759 3896">
+              </div>
+              <button onclick="saveContactSettings()" class="btn-primary w-full justify-center">Save Contact Details</button>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Change Admin Password</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Current Password</label>
+                <input id="s-pw-current" type="password" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">New Password</label>
+                <input id="s-pw-new" type="password" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Confirm New Password</label>
+                <input id="s-pw-confirm" type="password" class="form-input">
+                <p id="s-pw-err" class="text-red-500 text-xs mt-1 hidden"></p>
+              </div>
+              <button onclick="changePassword()" class="btn-primary w-full justify-center">Update Password</button>
+            </div>
+          </div>
+
+          <!-- Data Management -->
+          <div class="card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 pb-3 border-b border-gray-100">Data Management</h3>
+            <div class="space-y-3">
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 leading-relaxed">
+                <strong>Caution:</strong> These actions are irreversible. All changes publish to the main site immediately via the live sync connection.
+              </div>
+              <button onclick="resetPackages()" class="btn-danger w-full justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+                Reset Packages to Defaults
+              </button>
+              <button onclick="clearAllOrders()" class="btn-danger w-full justify-center">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                Clear All Orders
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL: ADD / EDIT PACKAGE
+═══════════════════════════════════════════ -->
+<div id="modal-package" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h3 id="pkg-modal-title" class="font-bold text-gray-900">Add Package</h3>
+      <button onclick="closePkgModal()" class="btn-icon w-7 h-7">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="pkg-edit-id">
+      <div>
+        <label class="form-label">Network</label>
+        <select id="pkg-net" class="form-input">
+          <option value="MTN">MTN</option>
+          <option value="AT">AT</option>
+          <option value="Telecel">Telecel</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Data Size</label>
+        <input id="pkg-size" type="text" class="form-input" placeholder="e.g. 5GB">
+        <p id="pkg-size-err" class="text-red-500 text-xs mt-1 hidden">Data size is required (e.g. 5GB)</p>
+      </div>
+      <div>
+        <label class="form-label">Price (GHS)</label>
+        <input id="pkg-price" type="number" step="0.01" min="0" class="form-input" placeholder="e.g. 29.00">
+        <p id="pkg-price-err" class="text-red-500 text-xs mt-1 hidden">Enter a valid price.</p>
+      </div>
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div>
+          <p class="text-sm font-semibold text-gray-700">Active</p>
+          <p class="text-xs text-gray-400">Show this package on the main site</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="pkg-active" class="toggle-input" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="closePkgModal()" class="btn-outline flex-1 justify-center">Cancel</button>
+      <button onclick="savePkg()" class="btn-primary flex-1 justify-center" id="pkg-save-btn">Save Package</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL: ADD / EDIT PROMOTION
+═══════════════════════════════════════════ -->
+<div id="modal-promo" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h3 id="promo-modal-title" class="font-bold text-gray-900">New Promotion</h3>
+      <button onclick="closePromoModal()" class="btn-icon w-7 h-7">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="promo-edit-id">
+      <div>
+        <label class="form-label">Promotion Title</label>
+        <input id="promo-title" type="text" class="form-input" placeholder="e.g. Weekend Flash Sale">
+        <p id="promo-title-err" class="text-red-500 text-xs mt-1 hidden">Title is required.</p>
+      </div>
+      <div>
+        <label class="form-label">Type</label>
+        <select id="promo-type" class="form-input" onchange="togglePromoFields()">
+          <option value="announcement">Announcement Bar (top of site)</option>
+          <option value="banner">Promo Banner (above pricing)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Message Text</label>
+        <input id="promo-text" type="text" class="form-input" placeholder="e.g. Get 5GB MTN for only GHS 25 this weekend!">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Background Color</label>
+          <div class="flex items-center gap-2">
+            <input id="promo-bg" type="color" class="w-10 h-9 rounded-lg border border-gray-200 cursor-pointer p-1" value="#0A4D9C">
+            <input id="promo-bg-txt" type="text" class="form-input flex-1 text-xs" value="#0A4D9C" oninput="syncColorInput('promo-bg','promo-bg-txt')">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Text Color</label>
+          <div class="flex items-center gap-2">
+            <input id="promo-color" type="color" class="w-10 h-9 rounded-lg border border-gray-200 cursor-pointer p-1" value="#ffffff">
+            <input id="promo-color-txt" type="text" class="form-input flex-1 text-xs" value="#ffffff" oninput="syncColorInput('promo-color','promo-color-txt')">
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div>
+          <p class="text-sm font-semibold text-gray-700">Active</p>
+          <p class="text-xs text-gray-400">Immediately visible on main site</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="promo-active" class="toggle-input">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="closePromoModal()" class="btn-outline flex-1 justify-center">Cancel</button>
+      <button onclick="savePromo()" class="btn-primary flex-1 justify-center">Save Promotion</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL: CONFIRM DELETE
+═══════════════════════════════════════════ -->
+<div id="modal-confirm" class="modal-overlay">
+  <div class="modal-box sm">
+    <div class="p-6">
+      <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-4">
+        <svg class="w-6 h-6 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      </div>
+      <h3 id="confirm-title" class="font-bold text-gray-900 mb-1">Confirm Delete</h3>
+      <p id="confirm-msg" class="text-sm text-gray-500 mb-5">This action cannot be undone.</p>
+      <div class="flex gap-3">
+        <button onclick="closeConfirm()" class="btn-outline flex-1 justify-center">Cancel</button>
+        <button id="confirm-ok-btn" class="btn-danger flex-1 justify-center">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container placeholder -->
+<div id="toast-wrap"></div>
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════ -->
+<script>
+// =====================================================================
+// CONSTANTS & DEFAULT DATA
+// =====================================================================
+const CHANNEL_NAME   = 'joewillz-channel';
+const STORAGE_KEY    = 'jwSiteData';
+const ORDERS_KEY     = 'jwOrders';
+const AUTH_KEY       = 'jwAdminAuth';
+const PW_KEY         = 'jwAdminPw';
+const DEFAULT_PW     = 'JoeWillz@2026';
+
+const DEFAULT_DATA = {
+  version: 2,
+  packages: {
+    MTN: [
+      {id:'mtn-1gb', size:'1GB',  price:5.50,   active:true},
+      {id:'mtn-2gb', size:'2GB',  price:11.00,  active:true},
+      {id:'mtn-3gb', size:'3GB',  price:17.00,  active:true},
+      {id:'mtn-4gb', size:'4GB',  price:23.00,  active:true},
+      {id:'mtn-5gb', size:'5GB',  price:29.00,  active:true},
+      {id:'mtn-6gb', size:'6GB',  price:33.00,  active:true},
+      {id:'mtn-7gb', size:'7GB',  price:36.00,  active:true},
+      {id:'mtn-8gb', size:'8GB',  price:40.00,  active:true},
+      {id:'mtn-9gb', size:'9GB',  price:43.00,  active:true},
+      {id:'mtn-10gb',size:'10GB', price:48.00,  active:true},
+      {id:'mtn-12gb',size:'12GB', price:58.00,  active:true},
+      {id:'mtn-15gb',size:'15GB', price:72.00,  active:true},
+      {id:'mtn-20gb',size:'20GB', price:87.00,  active:true},
+    ],
+    AT: [
+      {id:'at-1gb', size:'1GB',  price:5.00,  active:true},
+      {id:'at-2gb', size:'2GB',  price:10.00, active:true},
+      {id:'at-3gb', size:'3GB',  price:15.00, active:true},
+      {id:'at-4gb', size:'4GB',  price:17.50, active:true},
+      {id:'at-5gb', size:'5GB',  price:22.00, active:true},
+      {id:'at-6gb', size:'6GB',  price:27.00, active:true},
+      {id:'at-7gb', size:'7GB',  price:30.00, active:true},
+      {id:'at-8gb', size:'8GB',  price:34.00, active:true},
+      {id:'at-9gb', size:'9GB',  price:39.00, active:true},
+      {id:'at-10gb',size:'10GB', price:42.00, active:true},
+      {id:'at-12gb',size:'12GB', price:48.00, active:true},
+      {id:'at-15gb',size:'15GB', price:60.00, active:true},
+    ],
+    Telecel: [
+      {id:'tc-5gb', size:'5GB',  price:23.00,  active:true},
+      {id:'tc-10gb',size:'10GB', price:43.00,  active:true},
+      {id:'tc-15gb',size:'15GB', price:57.00,  active:true},
+      {id:'tc-20gb',size:'20GB', price:79.00,  active:true},
+      {id:'tc-25gb',size:'25GB', price:95.00,  active:true},
+      {id:'tc-30gb',size:'30GB', price:120.00, active:true},
+    ]
+  },
+  promotions: [],
+  settings: {
+    businessName:     'JoeWillz Data Bundle Hub',
+    tagline:          'Affordable and reliable data bundle services across Ghana.',
+    heroHeadline:     'Affordable Data Bundles Delivered Instantly Across Ghana',
+    heroSubheadline:  'Purchase MTN, AT, and Telecel data bundles at competitive rates and receive delivery within minutes directly to your phone.',
+    heroCta1:         'Buy Data Now',
+    heroCta2:         'Contact Support',
+    deliveryTime:     '1–5 minutes',
+    whatsapp:         '233507593896',
+    supportPhone:     '+233 50 759 3896',
+    paymentNetwork:   'Telecel Cash',
+    paymentName:      'Jonathan Zidan Nunoo',
+    paymentNumber:    '+233 50 759 3896',
+    paymentNumberClean: '+233507593896',
+    announcement: {active:false, text:'', bgColor:'#0A4D9C', textColor:'#ffffff'}
+  },
+  lastUpdated: null
+};
+
+// =====================================================================
+// STATE
+// =====================================================================
+let currentPkgNetwork = 'MTN';
+let editingPkgId      = null;  // pkg id being edited, null = new
+let editingPromoId    = null;
+let confirmCallback   = null;
+let revenueChart      = null;
+let networkChart      = null;
+let syncChannel       = null;
+
+// =====================================================================
+// DATA LAYER
+// =====================================================================
+function getSiteData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function setSiteData(data) {
+  data.lastUpdated = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function getOrders() {
+  try {
+    return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]');
+  } catch(e) { return []; }
+}
+
+function setOrders(orders) {
+  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+}
+
+function initData() {
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    setSiteData(JSON.parse(JSON.stringify(DEFAULT_DATA)));
+  }
+}
+
+function broadcastUpdate(type, payload) {
+  if (syncChannel) {
+    try {
+      syncChannel.postMessage({ type, payload, ts: Date.now() });
+    } catch(e) {}
+  }
+  flashSaved();
+}
+
+function flashSaved() {
+  const el = document.getElementById('save-indicator');
+  const ls = document.getElementById('last-saved');
+  el.classList.remove('hidden');
+  el.classList.add('flex');
+  const now = new Date();
+  if (ls) ls.textContent = now.toLocaleTimeString('en-GH', {hour:'2-digit', minute:'2-digit'});
+  setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 2500);
+}
+
+// =====================================================================
+// BROADCAST CHANNEL
+// =====================================================================
+function initChannel() {
+  try {
+    syncChannel = new BroadcastChannel(CHANNEL_NAME);
+    // Listen for pings from main site
+    syncChannel.onmessage = (e) => {
+      if (e.data.type === 'PING') {
+        syncChannel.postMessage({ type: 'PONG', ts: Date.now() });
+      }
+    };
+    // Update sync dot to live
+    const dot = document.getElementById('sync-dot');
+    const lbl = document.getElementById('sync-label');
+    if (dot) { dot.classList.add('sync-live'); dot.classList.remove('sync-idle'); }
+    if (lbl) lbl.textContent = 'Syncing live';
+  } catch(e) {
+    const lbl = document.getElementById('sync-label');
+    if (lbl) lbl.textContent = 'Single tab mode';
+  }
+}
+
+// =====================================================================
+// AUTH
+// =====================================================================
+function getStoredPw() {
+  return localStorage.getItem(PW_KEY) || DEFAULT_PW;
+}
+
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-err');
+  if (pw === getStoredPw()) {
+    sessionStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-app').style.display = 'flex';
+    err.classList.add('hidden');
+    onAppReady();
+  } else {
+    err.classList.remove('hidden');
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
+
+function checkAuth() {
+  if (sessionStorage.getItem(AUTH_KEY)) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-app').style.display = 'flex';
+    onAppReady();
+  }
+}
+
+// =====================================================================
+// APP INIT (called after auth)
+// =====================================================================
+function onAppReady() {
+  initData();
+  initChannel();
+  switchSection('overview');
+  updatePendingBadge();
+  updatePkgCount();
+  updatePromoCount();
+}
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+const SECTIONS = {
+  overview:   { title:'Overview',   sub:'Dashboard summary and quick stats' },
+  packages:   { title:'Packages',   sub:'Manage pricing across all networks' },
+  promotions: { title:'Promotions', sub:'Active banners and announcements' },
+  content:    { title:'Content',    sub:'Edit website copy and banners' },
+  orders:     { title:'Orders',     sub:'View and manage customer orders' },
+  settings:   { title:'Settings',   sub:'Payment, contact, and security settings' },
+};
+
+function switchSection(name) {
+  // Update panels
+  document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('sec-' + name);
+  if (el) el.classList.add('active');
+
+  // Update nav items
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + name);
+  if (navEl) navEl.classList.add('active');
+
+  // Update page title
+  const info = SECTIONS[name] || {};
+  document.getElementById('page-title').textContent = info.title || name;
+  document.getElementById('page-sub').textContent = info.sub || '';
+
+  closeSidebar();
+
+  // Section-specific init
+  if (name === 'overview')    renderOverview();
+  if (name === 'packages')    renderPkgTable();
+  if (name === 'promotions')  renderPromos();
+  if (name === 'content')     loadContentForm();
+  if (name === 'orders')      renderOrders();
+  if (name === 'settings')    loadSettingsForm();
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// =====================================================================
+// OVERVIEW SECTION
+// =====================================================================
+function renderOverview() {
+  const orders = getOrders();
+  const data   = getSiteData();
+
+  const completed  = orders.filter(o => o.status === 'Completed');
+  const pending    = orders.filter(o => o.status === 'Pending');
+  const totalRev   = completed.reduce((s, o) => s + (o.price || 0), 0);
+  const allActive  = Object.values(data.packages).flat().filter(p => p.active !== false).length;
+
+  document.getElementById('stat-revenue').textContent  = 'GHS ' + totalRev.toFixed(2);
+  document.getElementById('stat-orders').textContent   = orders.length;
+  document.getElementById('stat-pkgs').textContent     = allActive;
+  document.getElementById('stat-pending').textContent  = pending.length;
+
+  renderRecentOrders(orders);
+  createRevenueChart();
+  createNetworkChart(orders);
+}
+
+function renderRecentOrders(orders) {
+  const tbody = document.getElementById('recent-orders-tbody');
+  const recent = orders.slice(-5).reverse();
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400 text-sm">No orders yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = recent.map(o => `
+    <tr>
+      <td class="font-mono text-xs font-semibold text-blue-600">${o.id}</td>
+      <td class="font-medium">${o.customerName}</td>
+      <td><span class="ndot ndot-${o.network.toLowerCase()}"></span>${o.network}</td>
+      <td class="font-semibold">${o.package}</td>
+      <td class="font-bold text-blue-700">GHS ${(o.price||0).toFixed(2)}</td>
+      <td><span class="badge badge-${(o.status||'pending').toLowerCase()}">${o.status}</span></td>
+      <td class="text-gray-400 text-xs">${o.date}</td>
+    </tr>
+  `).join('');
+}
+
+function getRevenueByDay(days) {
+  const orders = getOrders().filter(o => o.status === 'Completed');
+  const result = {};
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    result[d.toISOString().split('T')[0]] = 0;
+  }
+  orders.forEach(o => {
+    if (o.iso) { const k = o.iso.split('T')[0]; if (k in result) result[k] += o.price || 0; }
+  });
+  return result;
+}
+
+function createRevenueChart() {
+  const ctx = document.getElementById('revenue-chart');
+  if (!ctx) return;
+  const days = parseInt(document.getElementById('rev-period')?.value || '7');
+  const raw  = getRevenueByDay(days);
+  const labels = Object.keys(raw).map(d => {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('en-GH', { month:'short', day:'numeric' });
+  });
+  const values = Object.values(raw);
+
+  if (revenueChart) { revenueChart.destroy(); revenueChart = null; }
+  revenueChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values, label: 'Revenue (GHS)',
+        borderColor: '#0A4D9C', backgroundColor: 'rgba(10,77,156,0.07)',
+        borderWidth: 2, fill: true, tension: 0.4,
+        pointRadius: 4, pointBackgroundColor: '#0A4D9C', pointBorderColor: '#fff', pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => 'GHS ' + c.raw.toFixed(2) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { font: { size: 11 }, color: '#94a3b8', callback: v => 'GHS ' + v }
+        }
+      }
+    }
+  });
+}
+
+function updateRevenueChart() { createRevenueChart(); }
+
+function createNetworkChart(orders) {
+  const ctx = document.getElementById('network-chart');
+  if (!ctx) return;
+
+  const counts = { MTN: 0, AT: 0, Telecel: 0 };
+  orders.forEach(o => { if (o.network in counts) counts[o.network]++; });
+  const labels = Object.keys(counts);
+  const values = Object.values(counts);
+  const colors = ['#FFCC00', '#E4002B', '#0099CC'];
+
+  if (networkChart) { networkChart.destroy(); networkChart = null; }
+
+  if (values.every(v => v === 0)) {
+    document.getElementById('net-legend').innerHTML = '<p class="text-xs text-gray-400 text-center">No orders yet.</p>';
+    networkChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#f1f5f9'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, cutout: '65%' }
+    });
+    return;
+  }
+
+  networkChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  const total = values.reduce((a, b) => a + b, 0);
+  document.getElementById('net-legend').innerHTML = labels.map((l, i) => `
+    <div class="flex items-center justify-between text-xs">
+      <div class="flex items-center gap-1.5">
+        <span style="background:${colors[i]}" class="w-2.5 h-2.5 rounded-full inline-block"></span>
+        <span class="text-gray-700 font-medium">${l}</span>
+      </div>
+      <span class="text-gray-500">${values[i]} (${total ? Math.round(values[i]/total*100) : 0}%)</span>
+    </div>
+  `).join('');
+}
+
+// =====================================================================
+// PACKAGES SECTION
+// =====================================================================
+function switchPkgTab(net) {
+  currentPkgNetwork = net;
+  ['MTN','AT','Telecel'].forEach(n => {
+    const btn = document.getElementById('ptab-' + n);
+    btn.className = 'pkg-tab';
+    if (n === net) btn.classList.add('active-' + n.toLowerCase());
+  });
+  renderPkgTable();
+}
+
+function renderPkgTable() {
+  const data = getSiteData();
+  const pkgs = data.packages[currentPkgNetwork] || [];
+  const tbody = document.getElementById('pkg-tbody');
+  const title = document.getElementById('pkg-table-title');
+  const count = document.getElementById('pkg-table-count');
+  const active = pkgs.filter(p => p.active !== false).length;
+
+  title.textContent = currentPkgNetwork + ' Packages';
+  count.textContent = `${active} active, ${pkgs.length - active} hidden`;
+
+  if (pkgs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-400 text-sm">No packages. Click "Add Package" to get started.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = pkgs.map((p, i) => {
+    const perGb = p.price / (parseFloat(p.size) || 1);
+    return `
+      <tr>
+        <td class="text-gray-400 text-xs">${i + 1}</td>
+        <td class="font-bold text-gray-900">${p.size}</td>
+        <td>
+          <span class="font-bold text-blue-700">GHS ${p.price.toFixed(2)}</span>
+        </td>
+        <td class="text-gray-400 text-xs">GHS ${perGb.toFixed(2)}/GB</td>
+        <td>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input" ${p.active !== false ? 'checked' : ''}
+                   onchange="togglePkg('${p.id}', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </td>
+        <td>
+          <div class="flex items-center gap-1.5">
+            <button onclick="openPkgModal('${p.id}')" class="btn-icon btn-sm" title="Edit">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+            </button>
+            <button onclick="confirmDeletePkg('${p.id}')" class="btn-icon btn-sm danger" title="Delete">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  updatePkgCount();
+}
+
+function openPkgModal(id) {
+  editingPkgId = id || null;
+  const data = getSiteData();
+  const title = document.getElementById('pkg-modal-title');
+
+  if (id) {
+    // Find the package
+    let pkg = null;
+    Object.keys(data.packages).forEach(net => {
+      const found = data.packages[net].find(p => p.id === id);
+      if (found) { pkg = found; }
+    });
+    if (!pkg) return;
+
+    title.textContent = 'Edit Package';
+    document.getElementById('pkg-net').value    = getNetworkForPkg(id, data);
+    document.getElementById('pkg-net').disabled = true;
+    document.getElementById('pkg-size').value   = pkg.size;
+    document.getElementById('pkg-price').value  = pkg.price;
+    document.getElementById('pkg-active').checked = pkg.active !== false;
+  } else {
+    title.textContent = 'Add Package';
+    document.getElementById('pkg-net').value    = currentPkgNetwork;
+    document.getElementById('pkg-net').disabled = false;
+    document.getElementById('pkg-size').value   = '';
+    document.getElementById('pkg-price').value  = '';
+    document.getElementById('pkg-active').checked = true;
+  }
+
+  ['pkg-size-err','pkg-price-err'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('modal-package').classList.add('open');
+}
+
+function getNetworkForPkg(id, data) {
+  for (const [net, pkgs] of Object.entries(data.packages)) {
+    if (pkgs.find(p => p.id === id)) return net;
+  }
+  return 'MTN';
+}
+
+function closePkgModal() {
+  document.getElementById('modal-package').classList.remove('open');
+  document.getElementById('pkg-net').disabled = false;
+  editingPkgId = null;
+}
+
+function savePkg() {
+  const size    = document.getElementById('pkg-size').value.trim();
+  const priceRaw = document.getElementById('pkg-price').value.trim();
+  const active  = document.getElementById('pkg-active').checked;
+  const net     = document.getElementById('pkg-net').value;
+  let valid     = true;
+
+  document.getElementById('pkg-size-err').classList.add('hidden');
+  document.getElementById('pkg-price-err').classList.add('hidden');
+
+  if (!size) { document.getElementById('pkg-size-err').classList.remove('hidden'); valid = false; }
+  const price = parseFloat(priceRaw);
+  if (isNaN(price) || price < 0) { document.getElementById('pkg-price-err').classList.remove('hidden'); valid = false; }
+  if (!valid) return;
+
+  const data = getSiteData();
+  if (editingPkgId) {
+    const pkgNet = getNetworkForPkg(editingPkgId, data);
+    const idx = data.packages[pkgNet].findIndex(p => p.id === editingPkgId);
+    if (idx >= 0) {
+      data.packages[pkgNet][idx] = { ...data.packages[pkgNet][idx], size, price, active };
+    }
+    showToast('Package updated and published.', 'success');
+  } else {
+    const id = net.toLowerCase() + '-' + size.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now();
+    if (!data.packages[net]) data.packages[net] = [];
+    data.packages[net].push({ id, size, price, active });
+    showToast('Package added and published.', 'success');
+  }
+
+  setSiteData(data);
+  broadcastUpdate('PACKAGES_UPDATED', data.packages);
+  closePkgModal();
+  renderPkgTable();
+  updatePkgCount();
+}
+
+function togglePkg(id, active) {
+  const data = getSiteData();
+  Object.keys(data.packages).forEach(net => {
+    const pkg = data.packages[net].find(p => p.id === id);
+    if (pkg) pkg.active = active;
+  });
+  setSiteData(data);
+  broadcastUpdate('PACKAGES_UPDATED', data.packages);
+  renderPkgTable();
+  showToast(`Package ${active ? 'activated' : 'hidden'}.`, active ? 'success' : 'info');
+}
+
+function confirmDeletePkg(id) {
+  confirmCallback = () => {
+    const data = getSiteData();
+    Object.keys(data.packages).forEach(net => {
+      data.packages[net] = data.packages[net].filter(p => p.id !== id);
+    });
+    setSiteData(data);
+    broadcastUpdate('PACKAGES_UPDATED', data.packages);
+    renderPkgTable();
+    updatePkgCount();
+    showToast('Package deleted.', 'warning');
+    closeConfirm();
+  };
+  showConfirm('Delete Package', 'This package will be removed from the main site immediately. This cannot be undone.');
+}
+
+function updatePkgCount() {
+  const data = getSiteData();
+  const total = Object.values(data.packages).flat().length;
+  const badge = document.getElementById('pkg-count');
+  if (badge) badge.textContent = total;
+}
+
+// =====================================================================
+// PROMOTIONS SECTION
+// =====================================================================
+function renderPromos() {
+  const data  = getSiteData();
+  const promos = data.promotions || [];
+  const list  = document.getElementById('promos-list');
+  const countEl = document.getElementById('promo-active-count');
+  const activeCount = promos.filter(p => p.active).length;
+
+  if (activeCount > 0) {
+    countEl.textContent = activeCount;
+    countEl.classList.remove('hidden');
+  } else {
+    countEl.classList.add('hidden');
+  }
+
+  if (promos.length === 0) {
+    list.innerHTML = `
+      <div class="card p-8 text-center text-gray-400">
+        <svg class="w-10 h-10 mx-auto mb-3 opacity-40" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/></svg>
+        <p class="text-sm font-medium">No promotions yet.</p>
+        <p class="text-xs mt-1">Create your first promotion to display on the main site.</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = promos.map(p => `
+    <div class="card p-5">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 class="font-bold text-gray-900 text-sm">${p.title}</h4>
+            <span class="badge ${p.active ? 'badge-active' : 'badge-inactive'}">${p.active ? 'Active' : 'Inactive'}</span>
+            <span class="badge" style="background:#e0f2fe;color:#0369a1">${p.type === 'announcement' ? 'Announcement Bar' : 'Promo Banner'}</span>
+          </div>
+          <div class="rounded-lg px-3 py-2 text-sm font-medium mt-2 inline-block max-w-full truncate"
+               style="background:${p.bgColor||'#0A4D9C'};color:${p.textColor||'#fff'}">
+            ${p.text || 'No message set'}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <label class="toggle-wrap" title="${p.active ? 'Deactivate' : 'Activate'}">
+            <input type="checkbox" class="toggle-input" ${p.active ? 'checked' : ''} onchange="togglePromo('${p.id}', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+          <button onclick="openPromoModal('${p.id}')" class="btn-icon" title="Edit">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+          </button>
+          <button onclick="confirmDeletePromo('${p.id}')" class="btn-icon danger" title="Delete">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openPromoModal(id) {
+  editingPromoId = id || null;
+  const data = getSiteData();
+
+  if (id) {
+    const p = (data.promotions || []).find(p => p.id === id);
+    if (!p) return;
+    document.getElementById('promo-modal-title').textContent = 'Edit Promotion';
+    document.getElementById('promo-edit-id').value = id;
+    document.getElementById('promo-title').value   = p.title;
+    document.getElementById('promo-type').value    = p.type || 'announcement';
+    document.getElementById('promo-text').value    = p.text || '';
+    document.getElementById('promo-bg').value      = p.bgColor || '#0A4D9C';
+    document.getElementById('promo-bg-txt').value  = p.bgColor || '#0A4D9C';
+    document.getElementById('promo-color').value   = p.textColor || '#ffffff';
+    document.getElementById('promo-color-txt').value = p.textColor || '#ffffff';
+    document.getElementById('promo-active').checked = p.active || false;
+  } else {
+    document.getElementById('promo-modal-title').textContent = 'New Promotion';
+    document.getElementById('promo-edit-id').value = '';
+    document.getElementById('promo-title').value   = '';
+    document.getElementById('promo-type').value    = 'announcement';
+    document.getElementById('promo-text').value    = '';
+    document.getElementById('promo-bg').value      = '#0A4D9C';
+    document.getElementById('promo-bg-txt').value  = '#0A4D9C';
+    document.getElementById('promo-color').value   = '#ffffff';
+    document.getElementById('promo-color-txt').value = '#ffffff';
+    document.getElementById('promo-active').checked = false;
+  }
+
+  document.getElementById('promo-title-err').classList.add('hidden');
+  document.getElementById('modal-promo').classList.add('open');
+}
+
+function closePromoModal() {
+  document.getElementById('modal-promo').classList.remove('open');
+  editingPromoId = null;
+}
+
+function savePromo() {
+  const title  = document.getElementById('promo-title').value.trim();
+  const type   = document.getElementById('promo-type').value;
+  const text   = document.getElementById('promo-text').value.trim();
+  const bg     = document.getElementById('promo-bg').value;
+  const color  = document.getElementById('promo-color').value;
+  const active = document.getElementById('promo-active').checked;
+
+  if (!title) { document.getElementById('promo-title-err').classList.remove('hidden'); return; }
+
+  const data = getSiteData();
+  if (!data.promotions) data.promotions = [];
+
+  if (editingPromoId) {
+    const idx = data.promotions.findIndex(p => p.id === editingPromoId);
+    if (idx >= 0) data.promotions[idx] = { ...data.promotions[idx], title, type, text, bgColor:bg, textColor:color, active };
+    showToast('Promotion updated.', 'success');
+  } else {
+    data.promotions.push({ id:'promo-' + Date.now(), title, type, text, bgColor:bg, textColor:color, active });
+    showToast('Promotion created.', 'success');
+  }
+
+  setSiteData(data);
+  broadcastUpdate('PROMOTIONS_UPDATED', data.promotions);
+  closePromoModal();
+  renderPromos();
+  updatePromoCount();
+}
+
+function togglePromo(id, active) {
+  const data = getSiteData();
+  const p = (data.promotions || []).find(p => p.id === id);
+  if (p) p.active = active;
+  setSiteData(data);
+  broadcastUpdate('PROMOTIONS_UPDATED', data.promotions);
+  renderPromos();
+  updatePromoCount();
+  showToast(`Promotion ${active ? 'activated' : 'deactivated'}.`, active ? 'success' : 'info');
+}
+
+function confirmDeletePromo(id) {
+  confirmCallback = () => {
+    const data = getSiteData();
+    data.promotions = (data.promotions || []).filter(p => p.id !== id);
+    setSiteData(data);
+    broadcastUpdate('PROMOTIONS_UPDATED', data.promotions);
+    renderPromos();
+    updatePromoCount();
+    showToast('Promotion deleted.', 'warning');
+    closeConfirm();
+  };
+  showConfirm('Delete Promotion', 'This promotion will be removed from the main site immediately.');
+}
+
+function updatePromoCount() {
+  const data = getSiteData();
+  const count = (data.promotions || []).filter(p => p.active).length;
+  const badge = document.getElementById('promo-active-count');
+  if (!badge) return;
+  badge.textContent = count;
+  count > 0 ? badge.classList.remove('hidden') : badge.classList.add('hidden');
+}
+
+function togglePromoFields() {} // reserved for future use
+
+// =====================================================================
+// CONTENT SECTION
+// =====================================================================
+function loadContentForm() {
+  const data = getSiteData();
+  const s = data.settings;
+  setVal('c-headline',    s.heroHeadline);
+  setVal('c-subheadline', s.heroSubheadline);
+  setVal('c-cta1',        s.heroCta1 || 'Buy Data Now');
+  setVal('c-cta2',        s.heroCta2 || 'Contact Support');
+  setVal('c-bizname',     s.businessName);
+  setVal('c-tagline',     s.tagline);
+  setVal('c-delivery',    s.deliveryTime);
+
+  const ann = s.announcement || {};
+  document.getElementById('c-ann-active').checked = ann.active || false;
+  setVal('c-ann-text',       ann.text || '');
+  setVal('c-ann-bg',         ann.bgColor || '#0A4D9C');
+  setVal('c-ann-bg-text',    ann.bgColor || '#0A4D9C');
+  setVal('c-ann-color',      ann.textColor || '#ffffff');
+  setVal('c-ann-color-text', ann.textColor || '#ffffff');
+  previewBanner();
+}
+
+function saveContent() {
+  const data = getSiteData();
+  data.settings.heroHeadline    = getVal('c-headline');
+  data.settings.heroSubheadline = getVal('c-subheadline');
+  data.settings.heroCta1        = getVal('c-cta1');
+  data.settings.heroCta2        = getVal('c-cta2');
+  setSiteData(data);
+  broadcastUpdate('SETTINGS_UPDATED', data.settings);
+  showToast('Hero content published to main site.', 'success');
+}
+
+function saveBanner() {
+  const data = getSiteData();
+  data.settings.announcement = {
+    active:    document.getElementById('c-ann-active').checked,
+    text:      getVal('c-ann-text'),
+    bgColor:   getVal('c-ann-bg'),
+    textColor: getVal('c-ann-color'),
+  };
+  setSiteData(data);
+  broadcastUpdate('SETTINGS_UPDATED', data.settings);
+  showToast(`Announcement banner ${data.settings.announcement.active ? 'activated' : 'deactivated'} on main site.`, 'success');
+}
+
+function saveBizInfo() {
+  const data = getSiteData();
+  data.settings.businessName = getVal('c-bizname');
+  data.settings.tagline      = getVal('c-tagline');
+  data.settings.deliveryTime = getVal('c-delivery');
+  setSiteData(data);
+  broadcastUpdate('SETTINGS_UPDATED', data.settings);
+  showToast('Business info saved.', 'success');
+}
+
+function previewBanner() {
+  const text   = getVal('c-ann-text') || 'Banner text will appear here';
+  const bg     = getVal('c-ann-bg')   || '#0A4D9C';
+  const color  = getVal('c-ann-color') || '#ffffff';
+  const prev   = document.getElementById('banner-preview');
+  if (prev) { prev.textContent = text; prev.style.background = bg; prev.style.color = color; }
+}
+
+function syncColorInput(colorId, textId) {
+  const colorEl = document.getElementById(colorId);
+  const textEl  = document.getElementById(textId);
+  if (!colorEl || !textEl) return;
+  const val = textEl.value;
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) colorEl.value = val;
+  if (colorId.includes('ann')) previewBanner();
+}
+
+// =====================================================================
+// ORDERS SECTION
+// =====================================================================
+function renderOrders() {
+  const search  = (document.getElementById('ord-search')?.value  || '').toLowerCase();
+  const netF    = document.getElementById('ord-net')?.value    || '';
+  const statusF = document.getElementById('ord-status')?.value || '';
+  const dateF   = document.getElementById('ord-date')?.value   || '';
+
+  let orders = getOrders();
+
+  orders = orders.filter(o => {
+    const ms = !search || [o.id, o.customerName, o.recipientPhone, o.transactionId]
+      .some(v => v && v.toLowerCase().includes(search));
+    const mn = !netF    || o.network === netF;
+    const ms2= !statusF || o.status  === statusF;
+    const md = !dateF   || (o.iso && o.iso.startsWith(dateF));
+    return ms && mn && ms2 && md;
+  });
+
+  const tbody  = document.getElementById('orders-tbody');
+  const label  = document.getElementById('ord-count-label');
+  const revEl  = document.getElementById('ord-revenue-filter');
+  const revenue = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.price || 0), 0);
+
+  label.textContent = `${orders.length} order${orders.length !== 1 ? 's' : ''}`;
+  revEl.textContent = 'GHS ' + revenue.toFixed(2);
+  updatePendingBadge();
+
+  if (orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-10 text-gray-400 text-sm">No orders found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = orders.slice().reverse().map(o => `
+    <tr>
+      <td class="font-mono text-xs font-bold text-blue-600">${o.id}</td>
+      <td class="text-xs text-gray-500 whitespace-nowrap">${o.date}<br><span class="text-gray-400">${o.time}</span></td>
+      <td class="font-medium text-sm">${o.customerName}</td>
+      <td><span class="flex items-center gap-1 text-sm"><span class="ndot ndot-${o.network.toLowerCase()}"></span>${o.network}</span></td>
+      <td class="font-semibold">${o.package}</td>
+      <td class="font-bold text-blue-700">GHS ${(o.price||0).toFixed(2)}</td>
+      <td class="font-mono text-xs">${o.recipientPhone}</td>
+      <td class="font-mono text-xs text-gray-500">${o.transactionId}</td>
+      <td>
+        <select class="text-xs rounded-lg px-2 py-1 border border-gray-200 font-semibold badge badge-${(o.status||'pending').toLowerCase()} cursor-pointer"
+                style="background:transparent"
+                onchange="updateOrderStatus('${o.id}', this.value)">
+          <option value="Pending"    ${o.status==='Pending'    ?'selected':''}>Pending</option>
+          <option value="Processing" ${o.status==='Processing' ?'selected':''}>Processing</option>
+          <option value="Completed"  ${o.status==='Completed'  ?'selected':''}>Completed</option>
+        </select>
+      </td>
+      <td>
+        <button onclick="confirmDeleteOrder('${o.id}')" class="btn-icon danger" title="Delete">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updateOrderStatus(id, status) {
+  const orders = getOrders();
+  const o = orders.find(x => x.id === id);
+  if (o) o.status = status;
+  setOrders(orders);
+  broadcastUpdate('ORDERS_UPDATED', null);
+  updatePendingBadge();
+  showToast(`Order ${id} → ${status}`, 'info');
+}
+
+function confirmDeleteOrder(id) {
+  confirmCallback = () => {
+    const orders = getOrders().filter(o => o.id !== id);
+    setOrders(orders);
+    broadcastUpdate('ORDERS_UPDATED', null);
+    renderOrders();
+    showToast('Order deleted.', 'warning');
+    closeConfirm();
+  };
+  showConfirm('Delete Order', `Remove order ${id}? This cannot be undone.`);
+}
+
+function clearOrdFilters() {
+  ['ord-search','ord-net','ord-status','ord-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderOrders();
+}
+
+function updatePendingBadge() {
+  const count  = getOrders().filter(o => o.status === 'Pending').length;
+  const badge  = document.getElementById('pending-badge');
+  if (!badge) return;
+  badge.textContent = count;
+  count > 0 ? badge.classList.remove('hidden') : badge.classList.add('hidden');
+}
+
+function exportOrders() {
+  const orders = getOrders();
+  if (orders.length === 0) { showToast('No orders to export.', 'warning'); return; }
+  const h = ['Order ID','Date','Time','Customer','Network','Package','Price (GHS)','Recipient','Sender','Txn ID','Status','Payment Method','Payment Receiver'];
+  const rows = orders.map(o => [o.id,o.date,o.time,`"${o.customerName}"`,o.network,o.package,o.price,o.recipientPhone,o.senderPhone,o.transactionId,o.status,o.paymentMethod,`"${o.paymentReceiver||''}"`]);
+  const csv  = [h.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const link = document.createElement('a');
+  link.href  = URL.createObjectURL(new Blob([csv], { type:'text/csv' }));
+  link.download = `joewillz-orders-${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  showToast(`Exported ${orders.length} orders.`, 'success');
+}
+
+// =====================================================================
+// SETTINGS SECTION
+// =====================================================================
+function loadSettingsForm() {
+  const data = getSiteData();
+  const s = data.settings;
+  setVal('s-pay-network', s.paymentNetwork || 'Telecel Cash');
+  setVal('s-pay-name',    s.paymentName);
+  setVal('s-pay-number',  s.paymentNumber);
+  setVal('s-pay-wa',      s.paymentNumberClean);
+  setVal('s-phone',       s.supportPhone);
+  setVal('s-whatsapp',    s.whatsapp);
+}
+
+function savePaymentSettings() {
+  const data = getSiteData();
+  data.settings.paymentNetwork     = getVal('s-pay-network');
+  data.settings.paymentName        = getVal('s-pay-name');
+  data.settings.paymentNumber      = getVal('s-pay-number');
+  data.settings.paymentNumberClean = getVal('s-pay-wa').replace(/\+|\s/g,'');
+  setSiteData(data);
+  broadcastUpdate('SETTINGS_UPDATED', data.settings);
+  showToast('Payment settings saved and published.', 'success');
+}
+
+function saveContactSettings() {
+  const data = getSiteData();
+  data.settings.supportPhone = getVal('s-phone');
+  data.settings.whatsapp     = getVal('s-whatsapp').replace(/\+|\s/g,'');
+  setSiteData(data);
+  broadcastUpdate('SETTINGS_UPDATED', data.settings);
+  showToast('Contact settings saved.', 'success');
+}
+
+function changePassword() {
+  const current  = document.getElementById('s-pw-current').value;
+  const newPw    = document.getElementById('s-pw-new').value;
+  const confirm  = document.getElementById('s-pw-confirm').value;
+  const err      = document.getElementById('s-pw-err');
+
+  err.classList.add('hidden');
+  if (current !== getStoredPw()) { err.textContent = 'Current password is incorrect.'; err.classList.remove('hidden'); return; }
+  if (newPw.length < 6)          { err.textContent = 'New password must be at least 6 characters.'; err.classList.remove('hidden'); return; }
+  if (newPw !== confirm)         { err.textContent = 'Passwords do not match.'; err.classList.remove('hidden'); return; }
+
+  localStorage.setItem(PW_KEY, newPw);
+  ['s-pw-current','s-pw-new','s-pw-confirm'].forEach(id => document.getElementById(id).value = '');
+  showToast('Password changed successfully.', 'success');
+}
+
+function resetPackages() {
+  confirmCallback = () => {
+    const data = getSiteData();
+    data.packages = JSON.parse(JSON.stringify(DEFAULT_DATA.packages));
+    setSiteData(data);
+    broadcastUpdate('PACKAGES_UPDATED', data.packages);
+    renderPkgTable();
+    updatePkgCount();
+    showToast('Packages reset to defaults.', 'success');
+    closeConfirm();
+  };
+  showConfirm('Reset All Packages', 'All packages will be reset to their original default values. This cannot be undone.');
+}
+
+function clearAllOrders() {
+  confirmCallback = () => {
+    setOrders([]);
+    broadcastUpdate('ORDERS_UPDATED', null);
+    renderOrders();
+    updatePendingBadge();
+    showToast('All orders cleared.', 'warning');
+    closeConfirm();
+  };
+  showConfirm('Clear All Orders', 'All order history will be permanently deleted. This cannot be undone.');
+}
+
+// =====================================================================
+// CONFIRM MODAL
+// =====================================================================
+function showConfirm(title, msg) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent   = msg;
+  document.getElementById('confirm-ok-btn').onclick    = confirmCallback;
+  document.getElementById('modal-confirm').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  confirmCallback = null;
+}
+
+// =====================================================================
+// UTILITIES
+// =====================================================================
+function showToast(msg, type = 'success') {
+  const colors = { success:'#16a34a', error:'#dc2626', info:'#0A4D9C', warning:'#d97706' };
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.background = colors[type] || colors.success;
+  t.textContent = msg;
+  document.getElementById('toast-wrap').appendChild(t);
+  setTimeout(() => {
+    t.style.opacity = '0'; t.style.transform = 'translateX(30px)'; t.style.transition = 'all 0.25s ease';
+    setTimeout(() => t.remove(), 300);
+  }, 2800);
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.type === 'checkbox') el.checked = !!val;
+  else el.value = val !== undefined && val !== null ? val : '';
+}
+
+function getVal(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  if (el.type === 'checkbox') return el.checked;
+  return el.value;
+}
+
+// Close modals on overlay click
+['modal-package','modal-promo','modal-confirm'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', e => { if (e.target === el) { if (id === 'modal-confirm') closeConfirm(); else if (id === 'modal-package') closePkgModal(); else if (id === 'modal-promo') closePromoModal(); } });
+});
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.addEventListener('DOMContentLoaded', function() {
+  checkAuth();
+  document.getElementById('login-pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+});
+</script>
+</body>
+</html>
